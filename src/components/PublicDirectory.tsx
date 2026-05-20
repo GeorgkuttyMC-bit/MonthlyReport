@@ -13,10 +13,10 @@ export function PublicDirectory({ employees, onSelectEmployee, onAdminLogin }: P
 
   const filtered = employees.filter(emp => {
     const term = search.toLowerCase();
-    const name = `${emp.First_Name || ''} ${emp.Last_Name || ''}`.toLowerCase();
+    const name = `${emp.Name || ''}`.toLowerCase();
     return name.includes(term) || 
            (emp.Department || '').toLowerCase().includes(term) ||
-           (emp.Employee_ID || '').toLowerCase().includes(term);
+           (emp.Email || '').toLowerCase().includes(term);
   });
 
   return (
@@ -52,7 +52,7 @@ export function PublicDirectory({ employees, onSelectEmployee, onAdminLogin }: P
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
             <input 
               type="text"
-              placeholder="Search by name, ID, or department..."
+              placeholder="Search by name, email, or department..."
               className="w-full pl-10 pr-4 py-3 rounded-xl border border-neutral-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent outline-none transition-all"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -85,16 +85,16 @@ export function PublicDirectory({ employees, onSelectEmployee, onAdminLogin }: P
                   <div className="flex items-start justify-between mb-4">
                     <div className="h-12 w-12 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100 group-hover:bg-indigo-600 transition-colors">
                       <span className="text-indigo-600 font-bold group-hover:text-white transition-colors">
-                        {(emp.First_Name?.[0] || '')}{(emp.Last_Name?.[0] || '')}
+                        {(emp.Name?.[0] || '')}
                       </span>
                     </div>
-                    <span className="text-xs font-medium text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full">
-                      {emp.Employee_ID}
+                    <span className="text-xs font-medium text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full truncate max-w-[120px]">
+                      {emp.Email}
                     </span>
                   </div>
                   
-                  <h3 className="text-lg font-bold text-neutral-900 line-clamp-1 mb-1">
-                    {emp.First_Name} {emp.Last_Name}
+                  <h3 className="text-lg font-bold text-neutral-900 line-clamp-1 mb-1" title={emp.Name}>
+                    {emp.Name}
                   </h3>
                   
                   <div className="flex items-center gap-2 text-sm text-neutral-500 mb-6">

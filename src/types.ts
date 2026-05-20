@@ -1,7 +1,5 @@
 export interface EmployeeData {
-  Employee_ID: string;
-  First_Name: string;
-  Last_Name: string;
+  Name: string;
   Email: string;
   Department: string;
   Q1_Score: number;

@@ -16,7 +16,7 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
   const [isDragging, setIsDragging] = useState(false);
 
   const expectedHeaders = [
-    'Employee_ID', 'First_Name', 'Last_Name', 'Email', 'Department',
+    'Name', 'Email', 'Department',
     'Q1_Score', 'Q2_Score', 'Q3_Score', 'Q4_Score', 'YTD_Sales', 'Leaves_Taken',
     'Technical_Skill', 'Leadership_Skill', 'Communication_Skill'
   ];
@@ -55,8 +55,8 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
           // We won't strictly error out to be flexible, but we could.
         }
 
-        if (!data.every(row => row.Employee_ID)) {
-          setError('Validation error: All rows must include an Employee_ID.');
+        if (!data.every(row => row.Name)) {
+          setError('Validation error: All rows must include a Name.');
           return;
         }
 
@@ -93,9 +93,7 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
   const downloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
       {
-        Employee_ID: 'EMP-001',
-        First_Name: 'Jane',
-        Last_Name: 'Doe',
+        Name: 'Jane Doe',
         Email: 'jane@co.com',
         Department: 'Sales',
         Q1_Score: 95,
@@ -189,7 +187,7 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
                 Template Guidelines
               </h3>
               <p className="text-neutral-500 mb-5 leading-relaxed">
-                Ensure your dataset follows the structural schema for accurate dashboard generation. Employee_ID is the primary key.
+                Ensure your dataset follows the structural schema for accurate dashboard generation. Name is the primary key.
               </p>
               <button 
                 onClick={downloadTemplate}
@@ -230,7 +228,6 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
                 <table className="w-full text-sm text-left">
                   <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 font-medium">
                     <tr>
-                      <th className="px-6 py-3">ID</th>
                       <th className="px-6 py-3">Name</th>
                       <th className="px-6 py-3">Email</th>
                       <th className="px-6 py-3">Department</th>
@@ -242,8 +239,7 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
                       const avg = Math.round(((emp.Q1_Score || 0) + (emp.Q2_Score || 0) + (emp.Q3_Score || 0) + (emp.Q4_Score || 0)) / 4) || 'N/A';
                       return (
                         <tr key={i} className="hover:bg-neutral-50 transition-colors">
-                          <td className="px-6 py-3 font-medium text-neutral-900">{emp.Employee_ID}</td>
-                          <td className="px-6 py-3">{emp.First_Name} {emp.Last_Name}</td>
+                          <td className="px-6 py-3 font-medium text-neutral-900">{emp.Name}</td>
                           <td className="px-6 py-3 text-neutral-500">{emp.Email}</td>
                           <td className="px-6 py-3">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-800">

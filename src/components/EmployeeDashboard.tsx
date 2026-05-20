@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
 } from 'recharts';
-import { ArrowLeft, User, Building2, TrendingUp, Calendar, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, User, Building2, TrendingUp, Calendar, Clock, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
 import { EmployeeData } from '../types';
 
 interface EmployeeDashboardProps {
@@ -13,6 +13,31 @@ interface EmployeeDashboardProps {
 }
 
 export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDashboardProps) {
+  const [insight, setInsight] = useState<string | null>(null);
+  const [loadingInsight, setLoadingInsight] = useState(false);
+  const [insightError, setInsightError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchInsight = async () => {
+      setLoadingInsight(true);
+      setInsightError(null);
+      try {
+        const res = await fetch('/api/insights', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ employee })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to fetch insights');
+        setInsight(data.insight);
+      } catch (err: any) {
+        setInsightError(err.message);
+      } finally {
+        setLoadingInsight(false);
+      }
+    };
+    fetchInsight();
+  }, [employee]);
   
   // Calculate Avg Score
   const scores = [employee.Q1_Score, employee.Q2_Score, employee.Q3_Score, employee.Q4_Score].filter(n => typeof n === 'number' && !isNaN(n));
@@ -71,7 +96,7 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
         
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:block">
           <h1 className="text-sm font-medium text-neutral-500">
-            Welcome back, <span className="text-neutral-900 font-semibold">{employee.First_Name}</span>
+            Welcome back, <span className="text-neutral-900 font-semibold">{employee.Name}</span>
           </h1>
         </div>
 
@@ -80,7 +105,7 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
             <div className="h-8 w-8 rounded-full bg-neutral-100 flex items-center justify-center border border-neutral-200">
               <User className="h-4 w-4 text-neutral-600" />
             </div>
-            <span className="font-medium">{employee.Employee_ID}</span>
+            <span className="font-medium">{employee.Email}</span>
           </div>
           <button 
             onClick={onBack}
@@ -142,6 +167,30 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
             </div>
           </div>
 
+        </section>
+
+        {/* AI INSIGHTS */}
+        <section className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-3">
+            <Sparkles className="h-5 w-5 text-indigo-600" />
+            <h3 className="text-lg font-bold text-indigo-900">AI Performance Summary</h3>
+          </div>
+          {loadingInsight ? (
+            <div className="animate-pulse flex space-x-4">
+              <div className="flex-1 space-y-3 py-1">
+                <div className="h-2 bg-indigo-200 rounded"></div>
+                <div className="h-2 bg-indigo-200 rounded w-5/6"></div>
+              </div>
+            </div>
+          ) : insightError ? (
+            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
+              {insightError}. Ensure your Gemini API Key is configured in the AI Studio Settings.
+            </p>
+          ) : (
+            <p className="text-sm text-indigo-800 leading-relaxed font-medium">
+              {insight || 'No insights generated.'}
+            </p>
+          )}
         </section>
 
         {/* VISUALIZATIONS */}
