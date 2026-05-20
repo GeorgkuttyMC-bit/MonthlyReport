@@ -67,7 +67,7 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
           return acc;
         }, {} as Record<string, OwnerData>);
 
-        const finalData = Object.values(grouped);
+        const finalData = Object.values(grouped) as OwnerData[];
 
         onDataLoaded(finalData);
         setSuccess(`Successfully uploaded and parsed ${validRows.length} records across ${finalData.length} unique owners.`);

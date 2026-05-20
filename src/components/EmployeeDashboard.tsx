@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
   PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
-import { ArrowLeft, Building2, TrendingUp, Clock, Sparkles, FolderKanban, Briefcase, Activity, Filter, ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowLeft, Building2, TrendingUp, Clock, Sparkles, FolderKanban, Briefcase, Activity, Filter, ArrowUpDown, ArrowDown, ArrowUp, AlertCircle } from 'lucide-react';
 import { OwnerData } from '../types';
 
 interface EmployeeDashboardProps {
