@@ -9,6 +9,7 @@ type ViewState = 'DIRECTORY' | 'EMPLOYEE_DASH' | 'ADMIN_LOGIN' | 'ADMIN_DASH';
 
 export default function App() {
   const [view, setView] = useState<ViewState>('DIRECTORY');
+  const [previousView, setPreviousView] = useState<ViewState>('DIRECTORY');
   const [employees, setEmployees] = useState<OwnerData[]>([]);
   const [currentUser, setCurrentUser] = useState<OwnerData | null>(null);
   const [adminName, setAdminName] = useState<string>('');
@@ -46,16 +47,35 @@ export default function App() {
     localStorage.setItem('companyData', JSON.stringify({ data, lastUpdated: now }));
   };
 
+  const handleClearData = () => {
+    setEmployees([]);
+    setLastUpdated('Never');
+    localStorage.removeItem('companyData');
+  };
+
   if (view === 'ADMIN_LOGIN') {
     return <Login onLogin={handleAdminLogin} onCancel={() => setView('DIRECTORY')} error={error} />;
   }
 
   if (view === 'ADMIN_DASH') {
-    return <AdminDashboard adminName={adminName} employees={employees} onDataLoaded={handleDataLoaded} onLogout={handleAdminLogout} />;
+    return (
+      <AdminDashboard 
+        adminName={adminName} 
+        employees={employees} 
+        onDataLoaded={handleDataLoaded} 
+        onLogout={handleAdminLogout} 
+        onViewEmployee={(emp) => {
+          setCurrentUser(emp);
+          setPreviousView('ADMIN_DASH');
+          setView('EMPLOYEE_DASH');
+        }}
+        onClearData={handleClearData}
+      />
+    );
   }
 
   if (view === 'EMPLOYEE_DASH' && currentUser) {
-    return <EmployeeDashboard employee={currentUser} lastUpdated={lastUpdated} onBack={() => setView('DIRECTORY')} />;
+    return <EmployeeDashboard employee={currentUser} lastUpdated={lastUpdated} onBack={() => setView(previousView)} />;
   }
 
   return (
@@ -63,6 +83,7 @@ export default function App() {
       employees={employees} 
       onSelectEmployee={(emp) => {
         setCurrentUser(emp);
+        setPreviousView('DIRECTORY');
         setView('EMPLOYEE_DASH');
       }} 
       onAdminLogin={() => setView('ADMIN_LOGIN')}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
-  PieChart, Pie, Cell, LineChart, Line
+  PieChart, Pie, Cell, LineChart, Line, ScatterChart, Scatter, ZAxis
 } from 'recharts';
 import { ArrowLeft, Building2, TrendingUp, Clock, Sparkles, FolderKanban, Briefcase, Activity, Filter, ArrowUpDown, ArrowDown, ArrowUp, AlertCircle } from 'lucide-react';
 import { OwnerData } from '../types';
@@ -19,16 +19,25 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
   const [textFilter, setTextFilter] = useState('');
   const [metricFilters, setMetricFilters] = useState<Record<string, { min: string, max: string }>>({});
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [scatterMetricX, setScatterMetricX] = useState<string>('');
+  const [scatterMetricY, setScatterMetricY] = useState<string>('');
 
   useEffect(() => {
     const fetchInsight = async () => {
       setLoadingInsight(true);
       setInsightError(null);
       try {
+        // Send only necessary data to avoid payload too large errors
+        const payload = {
+          Owner: employee.Owner,
+          Rows: employee.Rows.slice(0, 5),
+          TotalRows: employee.Rows.length
+        };
+
         const res = await fetch('/api/insights', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ employee })
+          body: JSON.stringify({ employee: payload })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to fetch insights');
@@ -56,6 +65,13 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
   
   const metrics = Array.from(numericKeys).slice(0, 4); // Take up to 4 numeric metrics for charting
   
+  useEffect(() => {
+    if (metrics.length > 0) {
+      if (!scatterMetricX) setScatterMetricX(metrics[0]);
+      if (!scatterMetricY) setScatterMetricY(metrics.length > 1 ? metrics[1] : metrics[0]);
+    }
+  }, [metrics.join(','), scatterMetricX, scatterMetricY]);
+
   // Group by Project Name to calculate values
   const projectStats = rows.reduce((acc, row) => {
      const proj = row['Project Name'] || 'Unknown Project';
@@ -64,7 +80,10 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
        metrics.forEach(m => acc[proj][m] = 0);
      }
      metrics.forEach(m => {
-       acc[proj][m] += (row[m] || 0);
+       const val = parseFloat(row[m] as any);
+       if (!isNaN(val)) {
+         acc[proj][m] += val;
+       }
      });
      return acc;
   }, {} as Record<string, any>);
@@ -73,9 +92,9 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
 
   // For Pie Chart - Aggregate the first metric across all projects to show project contribution
   const pieData = chartData.map((d: any) => ({
-    name: d.name,
-    value: metrics.length > 0 ? (d[metrics[0]] || 1) : 1
-  }));
+    name: String(d.name),
+    value: Math.max(0, metrics.length > 0 && typeof d[metrics[0]] === 'number' ? d[metrics[0]] : 1)
+  })).filter(d => d.value > 0);
 
   // Define colors for the charts
   const COLORS = ['#4f46e5', '#38bdf8', '#fbbf24', '#34d399', '#ec4899', '#8b5cf6'];
@@ -264,7 +283,7 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
 
         {/* VISUALIZATIONS */}
         {metrics.length > 0 && chartData.length > 0 && (
-          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
             {/* Primary Bar Chart */}
             <div className="lg:col-span-2 bg-white rounded-2xl border border-neutral-200 p-8 shadow-sm flex flex-col">
@@ -313,44 +332,106 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
               </div>
             </div>
 
-            {/* Secondary Charts Container */}
-            <div className="flex flex-col gap-6">
-              
-              {/* Project Distribution Pie Chart */}
-              <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm flex-1 flex flex-col">
-                <div className="mb-2">
-                  <h3 className="text-base font-bold">Project Distribution</h3>
-                  <p className="text-xs text-neutral-500">Based on {metrics[0]}</p>
-                </div>
-                <div className="flex-1 min-h-[220px] relative">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <RechartsTooltip 
-                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
-                    <span className="text-3xl font-bold text-neutral-800">{pieData.length}</span>
-                    <span className="text-xs text-neutral-500 uppercase tracking-widest mt-1">Total</span>
-                  </div>
+            {/* Project Distribution Pie Chart */}
+            <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm flex flex-col">
+              <div className="mb-2">
+                <h3 className="text-base font-bold">Project Distribution</h3>
+                <p className="text-xs text-neutral-500">Based on {metrics[0]}</p>
+              </div>
+              <div className="flex-1 min-h-[220px] relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <RechartsTooltip 
+                      contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
+                  <span className="text-3xl font-bold text-neutral-800">{pieData.length}</span>
+                  <span className="text-xs text-neutral-500 uppercase tracking-widest mt-1">Total</span>
                 </div>
               </div>
+            </div>
 
+            {/* Scatter Plot Chart */}
+            <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm flex flex-col">
+              <div className="mb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                <div>
+                  <h3 className="text-base font-bold">Metrics Relationship</h3>
+                  <p className="text-xs text-neutral-500">Scatter plot comparison</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <select 
+                    value={scatterMetricX}
+                    onChange={(e) => setScatterMetricX(e.target.value)}
+                    className="text-xs border border-neutral-200 rounded px-2 py-1 outline-none focus:border-indigo-500 bg-gray-50"
+                  >
+                    {metrics.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                  <span className="text-xs text-neutral-400">vs</span>
+                  <select 
+                    value={scatterMetricY}
+                    onChange={(e) => setScatterMetricY(e.target.value)}
+                    className="text-xs border border-neutral-200 rounded px-2 py-1 outline-none focus:border-indigo-500 bg-gray-50"
+                  >
+                    {metrics.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="flex-1 min-h-[220px]">
+                {scatterMetricX && scatterMetricY ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                      <XAxis 
+                        type="number" 
+                        dataKey={scatterMetricX} 
+                        name={scatterMetricX} 
+                        tick={{fontSize: 12, fill: '#6b7280'}} 
+                        axisLine={false} 
+                        tickLine={false}
+                      />
+                      <YAxis 
+                        type="number" 
+                        dataKey={scatterMetricY} 
+                        name={scatterMetricY} 
+                        tick={{fontSize: 12, fill: '#6b7280'}} 
+                        axisLine={false} 
+                        tickLine={false}
+                      />
+                      <ZAxis type="category" dataKey="name" name="Project" />
+                      <RechartsTooltip 
+                        cursor={{strokeDasharray: '3 3'}}
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                        itemStyle={{ fontWeight: '600' }}
+                      />
+                      <Scatter name="Projects" data={chartData} fill="#4f46e5" />
+                    </ScatterChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-sm text-neutral-400">
+                    Not enough numeric metrics.
+                  </div>
+                )}
+              </div>
             </div>
           </section>
         )}

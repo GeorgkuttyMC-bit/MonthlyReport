@@ -7,7 +7,8 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // API Route for Gemini Insights
   app.post('/api/insights', async (req, res) => {
@@ -27,9 +28,9 @@ async function startServer() {
         
         Owner Data Context:
         Owner Name: ${employee?.Owner}
-        Total Projects: ${employee?.Rows?.length || 0}
+        Total Projects: ${employee?.TotalRows || employee?.Rows?.length || 0}
         Aggregate Data (First 5 records):
-        ${JSON.stringify(employee?.Rows?.slice(0, 5) || [])}
+        ${JSON.stringify(employee?.Rows || [])}
       `;
 
       const response = await ai.models.generateContent({

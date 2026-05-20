@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { UploadCloud, Download, FileSpreadsheet, AlertCircle, CheckCircle2, LogOut, Users } from 'lucide-react';
+import { UploadCloud, Download, FileSpreadsheet, AlertCircle, CheckCircle2, LogOut, Users, Activity, Trash2 } from 'lucide-react';
 import { OwnerData } from '../types';
 
 interface AdminDashboardProps {
@@ -8,9 +8,11 @@ interface AdminDashboardProps {
   onLogout: () => void;
   onDataLoaded: (data: OwnerData[]) => void;
   employees: OwnerData[];
+  onViewEmployee: (emp: OwnerData) => void;
+  onClearData: () => void;
 }
 
-export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }: AdminDashboardProps) {
+export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees, onViewEmployee, onClearData }: AdminDashboardProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -233,7 +235,21 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
 
         {employees.length > 0 && (
           <div className="mt-10">
-            <h3 className="text-lg font-bold mb-4">Ingested Records Preview ({Math.min(5, employees.length)} of {employees.length})</h3>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold">Ingested Records Preview ({Math.min(5, employees.length)} of {employees.length})</h3>
+              <button 
+                onClick={() => {
+                  if (window.confirm("Are you sure you want to delete all uploaded data?")) {
+                    onClearData();
+                    setSuccess(null);
+                  }
+                }}
+                className="flex items-center gap-2 text-sm text-red-600 hover:text-red-700 font-medium transition-colors border border-red-200 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-lg"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete All Data
+              </button>
+            </div>
             <div className="border border-neutral-200 rounded-xl overflow-hidden bg-white shadow-sm">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
@@ -242,6 +258,7 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
                       <th className="px-6 py-3">Owner</th>
                       <th className="px-6 py-3">Total Project Records</th>
                       <th className="px-6 py-3">Sample Project</th>
+                      <th className="px-6 py-3">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
@@ -251,9 +268,18 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
                           <td className="px-6 py-3 font-medium text-neutral-900">{emp.Owner}</td>
                           <td className="px-6 py-3 text-neutral-500">{emp.Rows.length}</td>
                           <td className="px-6 py-3">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-800">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-800 border border-neutral-200">
                               {emp.Rows[0]?.['Project Name'] || 'N/A'}
                             </span>
+                          </td>
+                          <td className="px-6 py-3">
+                            <button
+                              onClick={() => onViewEmployee(emp)}
+                              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 hover:text-indigo-800 transition-colors"
+                            >
+                              <Activity className="h-3.5 w-3.5" />
+                              View Dashboard
+                            </button>
                           </td>
                         </tr>
                       );
