@@ -1,25 +1,19 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { UploadCloud, Download, FileSpreadsheet, AlertCircle, CheckCircle2, LogOut, Users } from 'lucide-react';
-import { EmployeeData } from '../types';
+import { OwnerData } from '../types';
 
 interface AdminDashboardProps {
   adminName: string;
   onLogout: () => void;
-  onDataLoaded: (data: EmployeeData[]) => void;
-  employees: EmployeeData[];
+  onDataLoaded: (data: OwnerData[]) => void;
+  employees: OwnerData[];
 }
 
 export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }: AdminDashboardProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-
-  const expectedHeaders = [
-    'Name', 'Email', 'Department',
-    'Q1_Score', 'Q2_Score', 'Q3_Score', 'Q4_Score', 'YTD_Sales', 'Leaves_Taken',
-    'Technical_Skill', 'Leadership_Skill', 'Communication_Skill'
-  ];
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -37,31 +31,46 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
       try {
         const bstr = evt.target?.result;
         const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
+        
+        const targetSheetName = "Monthly KPI Report - Data List";
+        const wsname = wb.SheetNames.includes(targetSheetName) ? targetSheetName : wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws) as any[];
+        let data = XLSX.utils.sheet_to_json(ws) as any[];
         
         if (data.length === 0) {
-          setError('The uploaded file is empty.');
+          setError(`The sheet "${wsname}" is empty.`);
           return;
         }
 
-        // Basic validation
-        const firstRow = data[0];
-        const missingHeaders = expectedHeaders.filter(h => !(h in firstRow));
+        // Clean up keys (sometimes excel has whitespace padding)
+        data = data.map(row => {
+          const newRow: any = {};
+          for (const key in row) {
+            newRow[key.trim()] = row[key];
+          }
+          return newRow;
+        });
+
+        if (!data.some(row => row.Owner)) {
+          setError('Validation error: All rows must include an "Owner" column.');
+          return;
+        }
+
+        const validRows = data.filter(row => row.Owner);
         
-        if (missingHeaders.length > 0) {
-          console.warn('Missing expected headers:', missingHeaders);
-          // We won't strictly error out to be flexible, but we could.
-        }
+        const grouped = validRows.reduce((acc, row) => {
+          const owner = row.Owner;
+          if (!acc[owner]) {
+            acc[owner] = { Owner: owner, Rows: [] };
+          }
+          acc[owner].Rows.push(row);
+          return acc;
+        }, {} as Record<string, OwnerData>);
 
-        if (!data.every(row => row.Name)) {
-          setError('Validation error: All rows must include a Name.');
-          return;
-        }
+        const finalData = Object.values(grouped);
 
-        onDataLoaded(data);
-        setSuccess(`Successfully uploaded and parsed ${data.length} employee records.`);
+        onDataLoaded(finalData);
+        setSuccess(`Successfully uploaded and parsed ${validRows.length} records across ${finalData.length} unique owners.`);
       } catch (err) {
         console.error(err);
         setError('Error parsing the file. Please ensure it is a valid Excel or CSV file.');
@@ -93,22 +102,20 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
   const downloadTemplate = () => {
     const ws = XLSX.utils.json_to_sheet([
       {
-        Name: 'Jane Doe',
-        Email: 'jane@co.com',
-        Department: 'Sales',
-        Q1_Score: 95,
-        Q2_Score: 92,
-        Q3_Score: 90,
-        Q4_Score: 96,
-        YTD_Sales: 120000,
-        Leaves_Taken: 4,
-        Technical_Skill: 80,
-        Leadership_Skill: 95,
-        Communication_Skill: 90
+        Owner: 'Jane Doe',
+        'Project Name': 'Website Redesign',
+        Metrics1: 95,
+        Metrics2: 92,
+      },
+      {
+        Owner: 'Jane Doe',
+        'Project Name': 'Mobile App Launch',
+        Metrics1: 88,
+        Metrics2: 120,
       }
     ]);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
+    XLSX.utils.book_append_sheet(wb, ws, 'Monthly KPI Report - Data List');
     XLSX.writeFile(wb, 'Employee_Dashboard_Template.xlsx');
   };
 
@@ -181,13 +188,13 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
           </div>
 
           <div className="space-y-6">
-            <div className="bg-white border text-sm border-neutral-200 rounded-xl p-6">
+             <div className="bg-white border text-sm border-neutral-200 rounded-xl p-6">
               <h3 className="font-semibold mb-3 flex items-center gap-2 text-base">
                 <FileSpreadsheet className="h-5 w-5 text-indigo-600" />
                 Template Guidelines
               </h3>
               <p className="text-neutral-500 mb-5 leading-relaxed">
-                Ensure your dataset follows the structural schema for accurate dashboard generation. Name is the primary key.
+                Ensure your dataset has a sheet named "Monthly KPI Report - Data List". The primary key for grouping is "Owner". Values will be calculated according to "Project Name".
               </p>
               <button 
                 onClick={downloadTemplate}
@@ -208,8 +215,12 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
               
               <div className="flex flex-col gap-4 relative z-10">
                 <div className="flex justify-between items-end border-b border-neutral-700 pb-3">
-                  <span className="text-neutral-400">Total Records</span>
+                  <span className="text-neutral-400">Total Owners</span>
                   <span className="text-2xl font-bold">{employees.length}</span>
+                </div>
+                <div className="flex justify-between items-end border-b border-neutral-700 pb-3">
+                  <span className="text-neutral-400">Total Projects</span>
+                  <span className="text-2xl font-bold">{employees.reduce((acc, emp) => acc + emp.Rows.length, 0)}</span>
                 </div>
                 <div className="flex justify-between items-end">
                   <span className="text-neutral-400">Last Synced</span>
@@ -228,25 +239,22 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
                 <table className="w-full text-sm text-left">
                   <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-600 font-medium">
                     <tr>
-                      <th className="px-6 py-3">Name</th>
-                      <th className="px-6 py-3">Email</th>
-                      <th className="px-6 py-3">Department</th>
-                      <th className="px-6 py-3">Avg Score</th>
+                      <th className="px-6 py-3">Owner</th>
+                      <th className="px-6 py-3">Total Project Records</th>
+                      <th className="px-6 py-3">Sample Project</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100">
                     {employees.slice(0, 5).map((emp, i) => {
-                      const avg = Math.round(((emp.Q1_Score || 0) + (emp.Q2_Score || 0) + (emp.Q3_Score || 0) + (emp.Q4_Score || 0)) / 4) || 'N/A';
                       return (
                         <tr key={i} className="hover:bg-neutral-50 transition-colors">
-                          <td className="px-6 py-3 font-medium text-neutral-900">{emp.Name}</td>
-                          <td className="px-6 py-3 text-neutral-500">{emp.Email}</td>
+                          <td className="px-6 py-3 font-medium text-neutral-900">{emp.Owner}</td>
+                          <td className="px-6 py-3 text-neutral-500">{emp.Rows.length}</td>
                           <td className="px-6 py-3">
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-800">
-                              {emp.Department}
+                              {emp.Rows[0]?.['Project Name'] || 'N/A'}
                             </span>
                           </td>
-                          <td className="px-6 py-3 font-mono">{avg}</td>
                         </tr>
                       );
                     })}
@@ -260,3 +268,4 @@ export function AdminDashboard({ adminName, onLogout, onDataLoaded, employees }:
     </div>
   );
 }
+

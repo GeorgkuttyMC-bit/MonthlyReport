@@ -1,24 +1,19 @@
-export interface EmployeeData {
-  Name: string;
-  Email: string;
-  Department: string;
-  Q1_Score: number;
-  Q2_Score: number;
-  Q3_Score: number;
-  Q4_Score: number;
-  YTD_Sales: string | number;
-  Leaves_Taken: number;
-  Technical_Skill: number;
-  Leadership_Skill: number;
-  Communication_Skill: number;
+export interface ProjectRow {
+  Owner: string;
+  'Project Name'?: string;
   [key: string]: any;
+}
+
+export interface OwnerData {
+  Owner: string;
+  Rows: ProjectRow[];
 }
 
 export type UserRole = 'ADMIN' | 'EMPLOYEE' | null;
 
 export interface AppState {
   role: UserRole;
-  currentUser: EmployeeData | null;
-  employees: EmployeeData[];
+  currentUser: OwnerData | null;
+  employees: OwnerData[];
   lastUpdated: string | null;
 }

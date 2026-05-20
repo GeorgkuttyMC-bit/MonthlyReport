@@ -21,17 +21,15 @@ async function startServer() {
       const { employee } = req.body;
       
       const prompt = `
-        You are an HR performance analyst. Analyze the following employee's performance data and provide a concise, 2-to-3 sentence professional summary. 
-        Highlight their key strengths and any areas for improvement based on their scores to help them succeed. Do not use generic filler words, be specific to the numbers provided.
+        You are a project performance analyst. Analyze the following owner's project records and provide a concise, 2-to-3 sentence professional summary. 
+        Highlight key strengths and any areas for improvement based on their associated metrics to help them succeed. Do not use generic filler words, be specific to the numbers provided.
         Format it as a plain text string. Do not use Markdown formatting like bold or headers.
         
-        Employee Data Context:
-        Name: ${employee.Name}
-        Department: ${employee.Department}
-        Quarterly Scores: Q1(${employee.Q1_Score}), Q2(${employee.Q2_Score}), Q3(${employee.Q3_Score}), Q4(${employee.Q4_Score})
-        Skills: Technical(${employee.Technical_Skill}), Leadership(${employee.Leadership_Skill}), Communication(${employee.Communication_Skill})
-        YTD Sales / Value Generated: ${employee.YTD_Sales}
-        Manager Feedback Action Items: ${employee.Action_Items || 'None'}
+        Owner Data Context:
+        Owner Name: ${employee?.Owner}
+        Total Projects: ${employee?.Rows?.length || 0}
+        Aggregate Data (First 5 records):
+        ${JSON.stringify(employee?.Rows?.slice(0, 5) || [])}
       `;
 
       const response = await ai.models.generateContent({

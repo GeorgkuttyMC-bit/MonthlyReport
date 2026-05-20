@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { EmployeeData } from './types';
+import { OwnerData } from './types';
 import { Login } from './components/Login';
 import { AdminDashboard } from './components/AdminDashboard';
 import { EmployeeDashboard } from './components/EmployeeDashboard';
@@ -9,8 +9,8 @@ type ViewState = 'DIRECTORY' | 'EMPLOYEE_DASH' | 'ADMIN_LOGIN' | 'ADMIN_DASH';
 
 export default function App() {
   const [view, setView] = useState<ViewState>('DIRECTORY');
-  const [employees, setEmployees] = useState<EmployeeData[]>([]);
-  const [currentUser, setCurrentUser] = useState<EmployeeData | null>(null);
+  const [employees, setEmployees] = useState<OwnerData[]>([]);
+  const [currentUser, setCurrentUser] = useState<OwnerData | null>(null);
   const [adminName, setAdminName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<string>('Never');
@@ -39,7 +39,7 @@ export default function App() {
     setView('DIRECTORY');
   };
 
-  const handleDataLoaded = (data: EmployeeData[]) => {
+  const handleDataLoaded = (data: OwnerData[]) => {
     setEmployees(data);
     const now = new Date().toLocaleString();
     setLastUpdated(now);

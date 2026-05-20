@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend,
+  PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
-import { ArrowLeft, User, Building2, TrendingUp, Calendar, Clock, CheckCircle2, AlertCircle, Sparkles } from 'lucide-react';
-import { EmployeeData } from '../types';
+import { ArrowLeft, Building2, TrendingUp, Clock, Sparkles, FolderKanban, Briefcase, Activity, Filter, ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
+import { OwnerData } from '../types';
 
 interface EmployeeDashboardProps {
-  employee: EmployeeData;
+  employee: OwnerData;
   onBack: () => void;
   lastUpdated: string;
 }
@@ -16,6 +16,9 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
   const [insight, setInsight] = useState<string | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
   const [insightError, setInsightError] = useState<string | null>(null);
+  const [textFilter, setTextFilter] = useState('');
+  const [metricFilters, setMetricFilters] = useState<Record<string, { min: string, max: string }>>({});
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
   useEffect(() => {
     const fetchInsight = async () => {
@@ -36,54 +39,103 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
         setLoadingInsight(false);
       }
     };
-    fetchInsight();
+    if (employee) fetchInsight();
   }, [employee]);
   
-  // Calculate Avg Score
-  const scores = [employee.Q1_Score, employee.Q2_Score, employee.Q3_Score, employee.Q4_Score].filter(n => typeof n === 'number' && !isNaN(n));
-  const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const rows = employee?.Rows || [];
+  
+  // Find numeric columns dynamically for charting
+  const numericKeys = new Set<string>();
+  rows.forEach(r => {
+    Object.keys(r).forEach(k => {
+      if (typeof r[k] === 'number' && k !== 'Owner' && k !== 'Project Name') {
+        numericKeys.add(k);
+      }
+    });
+  });
+  
+  const metrics = Array.from(numericKeys).slice(0, 4); // Take up to 4 numeric metrics for charting
+  
+  // Group by Project Name to calculate values
+  const projectStats = rows.reduce((acc, row) => {
+     const proj = row['Project Name'] || 'Unknown Project';
+     if (!acc[proj]) {
+       acc[proj] = { name: proj };
+       metrics.forEach(m => acc[proj][m] = 0);
+     }
+     metrics.forEach(m => {
+       acc[proj][m] += (row[m] || 0);
+     });
+     return acc;
+  }, {} as Record<string, any>);
+  
+  const chartData = Object.values(projectStats);
 
-  // Format Performance Data
-  const performanceData = [
-    { name: 'Q1', score: employee.Q1_Score || 0 },
-    { name: 'Q2', score: employee.Q2_Score || 0 },
-    { name: 'Q3', score: employee.Q3_Score || 0 },
-    { name: 'Q4', score: employee.Q4_Score || 0 },
-  ];
+  // For Pie Chart - Aggregate the first metric across all projects to show project contribution
+  const pieData = chartData.map((d: any) => ({
+    name: d.name,
+    value: metrics.length > 0 ? (d[metrics[0]] || 1) : 1
+  }));
 
-  // Format Skills Data
-  const skillsData = [
-    { subject: 'Technical', A: employee.Technical_Skill || 0, fullMark: 100 },
-    { subject: 'Leadership', A: employee.Leadership_Skill || 0, fullMark: 100 },
-    { subject: 'Communication', A: employee.Communication_Skill || 0, fullMark: 100 },
-    { subject: 'Problem Solving', A: Math.round(((employee.Technical_Skill || 0) + (employee.Leadership_Skill || 0)) / 2), fullMark: 100 },
-    { subject: 'Teamwork', A: Math.round(((employee.Communication_Skill || 0) + (employee.Leadership_Skill || 0)) / 2), fullMark: 100 },
-  ];
+  // Define colors for the charts
+  const COLORS = ['#4f46e5', '#38bdf8', '#fbbf24', '#34d399', '#ec4899', '#8b5cf6'];
 
-  // Mock Tasks / Projects based heavily on the user's role to feel realistic
-  const determineProjects = (dept: string) => {
-    if (dept.toLowerCase().includes('sales')) {
-      return [
-        { name: 'Q3 Enterprise Outreach', status: 'In Progress', due: 'Oct 15', feedback: 'Great momentum' },
-        { name: 'Client Retention Plan', status: 'Completed', due: 'Sep 01', feedback: 'Exceeded goals' },
-      ];
+  // Apply filters for the table
+  let filteredRows = rows.filter(row => {
+    // Project Name filter
+    if (textFilter && !(row['Project Name'] || '').toLowerCase().includes(textFilter.toLowerCase())) {
+      return false;
     }
-    if (dept.toLowerCase().includes('engin')) {
-      return [
-        { name: 'API V2 Migration', status: 'In Progress', due: 'Nov 01', feedback: 'On track, good test coverage' },
-        { name: 'Database Optimization', status: 'Pending Review', due: 'Oct 20', feedback: 'Awaiting QA' },
-      ];
+    
+    // Metrics filters
+    for (const m of metrics) {
+      if (metricFilters[m]) {
+        const val = row[m];
+        const min = parseFloat(metricFilters[m].min);
+        const max = parseFloat(metricFilters[m].max);
+        
+        if (!isNaN(min) && (val == null || val < min)) return false;
+        if (!isNaN(max) && (val == null || val > max)) return false;
+      }
     }
-    return [
-      { name: 'Cross-functional Sync', status: 'In Progress', due: 'Oct 30', feedback: 'Needs more documentation' },
-      { name: 'Quarterly OKRs Review', status: 'Completed', due: 'Sep 15', feedback: 'Well aligned' },
-    ];
+    
+    return true;
+  });
+
+  if (sortConfig !== null) {
+    filteredRows.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      
+      let valA = a[key];
+      let valB = b[key];
+
+      if (typeof valA === 'string' && typeof valB === 'string') {
+        valA = valA.toLowerCase();
+        valB = valB.toLowerCase();
+      }
+
+      if (valA === valB) return 0;
+      
+      // Handle null/undefined values by pushing them to the end
+      if (valA == null) return direction === 'asc' ? 1 : -1;
+      if (valB == null) return direction === 'asc' ? -1 : 1;
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }
+
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
   };
 
-  const tasks = determineProjects(employee.Department || '');
-
   return (
-    <div className="min-h-screen bg-[#FDFDFD] text-neutral-900 font-sans">
+    <div className="min-h-screen bg-[#FDFDFD] text-neutral-900 font-sans pb-12">
       
       {/* HEADER */}
       <header className="bg-white border-b border-neutral-200 px-8 py-4 flex items-center justify-between sticky top-0 z-20 shadow-sm">
@@ -96,23 +148,17 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
         
         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:block">
           <h1 className="text-sm font-medium text-neutral-500">
-            Welcome back, <span className="text-neutral-900 font-semibold">{employee.Name}</span>
+            Overview for <span className="text-neutral-900 font-semibold">{employee?.Owner}</span>
           </h1>
         </div>
 
         <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-2 text-sm text-neutral-600 pr-4 border-r border-neutral-200">
-            <div className="h-8 w-8 rounded-full bg-neutral-100 flex items-center justify-center border border-neutral-200">
-              <User className="h-4 w-4 text-neutral-600" />
-            </div>
-            <span className="font-medium">{employee.Email}</span>
-          </div>
           <button 
             onClick={onBack}
-            className="flex items-center gap-2 text-sm text-neutral-600 hover:text-indigo-600 font-medium transition-colors"
+            className="flex items-center gap-2 text-sm text-neutral-600 hover:text-indigo-600 font-medium transition-colors border border-neutral-200 px-4 py-2 rounded-lg hover:border-indigo-200 hover:bg-indigo-50 shadow-sm hover:shadow"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Directory
+            Back to Main Menu
           </button>
         </div>
       </header>
@@ -120,176 +166,306 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
       <main className="max-w-7xl mx-auto py-10 px-4 sm:px-6 lg:px-8 space-y-8">
         
         {/* OVERVIEW WIDGETS */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="grid grid-cols-1 md:grid-cols-4 gap-4">
           
-          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
+          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <FolderKanban className="h-24 w-24 text-indigo-600" />
+            </div>
+            <div className="flex justify-between items-start mb-4 relative z-10">
               <div className="p-2 bg-indigo-50 rounded-lg">
-                <Building2 className="h-5 w-5 text-indigo-600" />
+                <FolderKanban className="h-5 w-5 text-indigo-600" />
               </div>
             </div>
-            <p className="text-sm text-neutral-500 font-medium mb-1">Current Role</p>
-            <h2 className="text-xl font-bold truncate" title={employee.Department}>{employee.Department || 'Unassigned'}</h2>
+            <p className="text-sm text-neutral-500 font-medium mb-1 relative z-10">Total Records</p>
+            <h2 className="text-3xl font-bold tracking-tight relative z-10">{rows.length}</h2>
           </div>
 
-          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-2 bg-emerald-50 rounded-lg">
-                <TrendingUp className="h-5 w-5 text-emerald-600" />
-              </div>
-              <span className="text-xs font-bold px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full">Top 10%</span>
+          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Building2 className="h-24 w-24 text-blue-600" />
             </div>
-            <p className="text-sm text-neutral-500 font-medium mb-1">Performance Score</p>
-            <h2 className="text-xl font-bold flex items-baseline gap-1">
-              {avgScore} <span className="text-sm font-normal text-neutral-400">/ 100</span>
+            <div className="flex justify-between items-start mb-4 relative z-10">
+              <div className="p-2 bg-blue-50 rounded-lg">
+                <Building2 className="h-5 w-5 text-blue-600" />
+              </div>
+            </div>
+            <p className="text-sm text-neutral-500 font-medium mb-1 relative z-10">Unique Projects</p>
+            <h2 className="text-3xl font-bold tracking-tight relative z-10">
+              {Object.keys(projectStats).length}
             </h2>
           </div>
 
-          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex justify-between items-start mb-4">
-              <div className="p-2 bg-amber-50 rounded-lg">
-                <Calendar className="h-5 w-5 text-amber-600" />
+          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 opacity-5 group-hover:opacity-10 transition-opacity">
+              <Activity className="h-24 w-24 text-emerald-600" />
+            </div>
+            <div className="flex justify-between items-start mb-4 relative z-10">
+              <div className="p-2 bg-emerald-50 rounded-lg">
+                <Activity className="h-5 w-5 text-emerald-600" />
               </div>
             </div>
-            <p className="text-sm text-neutral-500 font-medium mb-1">Leaves Taken</p>
-            <h2 className="text-xl font-bold">{employee.Leaves_Taken || 0} <span className="text-sm font-normal text-neutral-400">Days</span></h2>
+            <p className="text-sm text-neutral-500 font-medium mb-1 relative z-10">Tracked Metrics</p>
+            <h2 className="text-3xl font-bold tracking-tight flex items-baseline gap-1 relative z-10">
+              {metrics.length} <span className="text-sm font-normal text-neutral-400">Columns</span>
+            </h2>
           </div>
 
-          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between">
-            <div className="flex justify-between items-start mb-4">
+          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between relative overflow-hidden group">
+            <div className="flex justify-between items-start mb-4 relative z-10">
               <div className="p-2 bg-neutral-100 rounded-lg">
                 <Clock className="h-5 w-5 text-neutral-600" />
               </div>
             </div>
-            <div>
+            <div className="relative z-10">
               <p className="text-sm text-neutral-500 font-medium mb-1">Last Synced</p>
-              <h2 className="text-sm font-bold truncate">{lastUpdated}</h2>
+              <h2 className="text-sm font-bold truncate text-neutral-900">{lastUpdated}</h2>
             </div>
           </div>
 
         </section>
 
         {/* AI INSIGHTS */}
-        <section className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="h-5 w-5 text-indigo-600" />
-            <h3 className="text-lg font-bold text-indigo-900">AI Performance Summary</h3>
+        <section className="relative bg-gradient-to-br from-indigo-50 via-purple-50 to-white rounded-2xl border border-indigo-100 p-8 shadow-sm overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+            <Sparkles className="w-32 h-32 text-indigo-600" />
           </div>
-          {loadingInsight ? (
-            <div className="animate-pulse flex space-x-4">
-              <div className="flex-1 space-y-3 py-1">
-                <div className="h-2 bg-indigo-200 rounded"></div>
-                <div className="h-2 bg-indigo-200 rounded w-5/6"></div>
+          <div className="relative z-10">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-indigo-600" />
               </div>
+              <h3 className="text-xl font-bold text-indigo-900">AI Performance Summary</h3>
             </div>
-          ) : insightError ? (
-            <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
-              {insightError}. Ensure your Gemini API Key is configured in the AI Studio Settings.
-            </p>
-          ) : (
-            <p className="text-sm text-indigo-800 leading-relaxed font-medium">
-              {insight || 'No insights generated.'}
-            </p>
-          )}
+            <div className="bg-white/60 backdrop-blur-sm rounded-xl p-6 border border-white shadow-sm">
+              {loadingInsight ? (
+                <div className="animate-pulse flex space-x-4">
+                  <div className="flex-1 space-y-3 py-1">
+                    <div className="h-2 bg-indigo-200/50 rounded w-3/4"></div>
+                    <div className="h-2 bg-indigo-200/50 rounded w-5/6"></div>
+                    <div className="h-2 bg-indigo-200/50 rounded w-4/6"></div>
+                  </div>
+                </div>
+              ) : insightError ? (
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-600">
+                    {insightError}. Ensure your Gemini API Key is configured in the AI Studio Settings.
+                  </p>
+                </div>
+              ) : (
+                <p className="text-base text-indigo-900/80 leading-relaxed font-medium">
+                  {insight || 'No insights generated. Try reloading the dashboard or checking your API configuration.'}
+                </p>
+              )}
+            </div>
+          </div>
         </section>
 
         {/* VISUALIZATIONS */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          
-          <div className="bg-white rounded-2xl border border-neutral-200 p-8 shadow-sm">
-            <div className="mb-6">
-              <h3 className="text-lg font-bold">Quarterly Trajectory</h3>
-              <p className="text-sm text-neutral-500">Your performance mapped across the fiscal year.</p>
+        {metrics.length > 0 && chartData.length > 0 && (
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* Primary Bar Chart */}
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-neutral-200 p-8 shadow-sm flex flex-col">
+              <div className="mb-6 flex items-center gap-3">
+                <Briefcase className="h-5 w-5 text-indigo-600" />
+                <div>
+                  <h3 className="text-lg font-bold">Metrics by Project</h3>
+                  <p className="text-sm text-neutral-500">Aggregated performance values mapped across projects.</p>
+                </div>
+              </div>
+              <div className="flex-1 min-h-[350px] w-full mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 10, right: 10, bottom: 20, left: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fill: '#6b7280', fontSize: 12}} 
+                      dy={10} 
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{fill: '#6b7280', fontSize: 12}} 
+                      dx={-10}
+                    />
+                    <RechartsTooltip 
+                      contentStyle={{ borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                      itemStyle={{ fontWeight: '600' }}
+                      cursor={{fill: '#f3f4f6'}}
+                    />
+                    <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
+                    {metrics.map((metric, idx) => (
+                      <Bar 
+                        key={metric} 
+                        dataKey={metric} 
+                        fill={COLORS[idx % COLORS.length]} 
+                        radius={[4, 4, 0, 0]} 
+                        maxBarSize={50} 
+                        animationDuration={1500}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={performanceData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e5e5" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#71717a', fontSize: 13}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#71717a', fontSize: 13}} domain={[0, 100]} />
-                  <RechartsTooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
-                    itemStyle={{ color: '#4f46e5', fontWeight: 'bold' }}
-                  />
-                  <Line type="monotone" dataKey="score" stroke="#4f46e5" strokeWidth={3} dot={{r: 5, strokeWidth: 2, fill: '#fff'}} activeDot={{ r: 7 }} />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
 
-          <div className="bg-white rounded-2xl border border-neutral-200 p-8 shadow-sm">
-            <div className="mb-2">
-              <h3 className="text-lg font-bold">Skill Competency Matrix</h3>
-              <p className="text-sm text-neutral-500">Multi-dimensional assessment profile.</p>
-            </div>
-            <div className="h-[320px] w-full flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={skillsData}>
-                  <PolarGrid stroke="#e5e5e5" />
-                  <PolarAngleAxis dataKey="subject" tick={{fill: '#52525b', fontSize: 12, fontWeight: 500}} />
-                  <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
-                  <Radar name="Employee" dataKey="A" stroke="#4f46e5" fill="#4f46e5" fillOpacity={0.2} />
-                  <RechartsTooltip />
-                </RadarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+            {/* Secondary Charts Container */}
+            <div className="flex flex-col gap-6">
+              
+              {/* Project Distribution Pie Chart */}
+              <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm flex-1 flex flex-col">
+                <div className="mb-2">
+                  <h3 className="text-base font-bold">Project Distribution</h3>
+                  <p className="text-xs text-neutral-500">Based on {metrics[0]}</p>
+                </div>
+                <div className="flex-1 min-h-[220px] relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        stroke="none"
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip 
+                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none flex-col">
+                    <span className="text-3xl font-bold text-neutral-800">{pieData.length}</span>
+                    <span className="text-xs text-neutral-500 uppercase tracking-widest mt-1">Total</span>
+                  </div>
+                </div>
+              </div>
 
-        </section>
+            </div>
+          </section>
+        )}
 
         {/* DETAILS TABLE */}
         <section>
-          <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
-            <div className="px-8 py-6 border-b border-neutral-200 flex justify-between items-center bg-neutral-50/50">
+
+          {/* FILTERS */}
+          <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-sm mb-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Filter className="h-4 w-4 text-indigo-600" />
+              <h4 className="text-sm font-bold text-neutral-900">Filter Table Records</h4>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {/* Project Name Filter */}
               <div>
-                <h3 className="text-lg font-bold text-neutral-900">Current Initiatives</h3>
-                <p className="text-sm text-neutral-500">Active tasks and management feedback.</p>
+                <label className="block text-xs font-medium text-neutral-500 mb-1.5">Project Name</label>
+                <input 
+                  type="text" 
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 outline-none transition-shadow"
+                  placeholder="Contains text..."
+                  value={textFilter}
+                  onChange={e => setTextFilter(e.target.value)}
+                />
+              </div>
+
+              {/* Metric Filters */}
+              {metrics.map(m => (
+                <div key={m}>
+                  <label className="block text-xs font-medium text-neutral-500 mb-1.5" title={m}>
+                    <span className="truncate block">{m} (Range)</span>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 outline-none transition-shadow"
+                      placeholder="Min"
+                      value={metricFilters[m]?.min || ''}
+                      onChange={e => setMetricFilters(prev => ({ ...prev, [m]: { ...prev[m], min: e.target.value } }))}
+                    />
+                    <span className="text-neutral-400">-</span>
+                    <input 
+                      type="number" 
+                      className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-600 outline-none transition-shadow"
+                      placeholder="Max"
+                      value={metricFilters[m]?.max || ''}
+                      onChange={e => setMetricFilters(prev => ({ ...prev, [m]: { ...prev[m], max: e.target.value } }))}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-neutral-200 overflow-hidden shadow-sm">
+            <div className="px-8 py-6 border-b border-neutral-200 flex justify-between items-center bg-gray-50/50">
+              <div>
+                <h3 className="text-lg font-bold text-neutral-900">Project Master List</h3>
+                <p className="text-sm text-neutral-500">Detailed line items from the dataset.</p>
               </div>
             </div>
             
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left">
-                <thead className="text-xs text-neutral-500 bg-white border-b border-neutral-200 uppercase tracking-wider font-semibold">
+                <thead className="text-xs text-neutral-500 bg-gray-50/80 border-b border-neutral-200 uppercase tracking-wider font-semibold">
                   <tr>
-                    <th className="px-8 py-4">Task Name</th>
-                    <th className="px-8 py-4">Status</th>
-                    <th className="px-8 py-4">Due Date</th>
-                    <th className="px-8 py-4">Manager Feedback</th>
+                    <th 
+                      className="px-8 py-4 whitespace-nowrap cursor-pointer hover:bg-gray-100 transition-colors group select-none"
+                      onClick={() => handleSort('Project Name')}
+                    >
+                      <div className="flex items-center gap-2">
+                        Project Name
+                        {sortConfig?.key === 'Project Name' ? (
+                          sortConfig.direction === 'asc' ? <ArrowUp className="h-3.5 w-3.5 text-indigo-600" /> : <ArrowDown className="h-3.5 w-3.5 text-indigo-600" />
+                        ) : (
+                          <ArrowUpDown className="h-3.5 w-3.5 text-neutral-300 group-hover:text-neutral-500" />
+                        )}
+                      </div>
+                    </th>
+                    {metrics.map(m => (
+                      <th 
+                        key={m} 
+                        className="px-8 py-4 whitespace-nowrap text-right cursor-pointer hover:bg-gray-100 transition-colors group select-none"
+                        onClick={() => handleSort(m)}
+                      >
+                        <div className="flex items-center justify-end gap-2">
+                          {sortConfig?.key === m ? (
+                            sortConfig.direction === 'asc' ? <ArrowUp className="h-3.5 w-3.5 text-indigo-600" /> : <ArrowDown className="h-3.5 w-3.5 text-indigo-600" />
+                          ) : (
+                            <ArrowUpDown className="h-3.5 w-3.5 text-neutral-300 group-hover:text-neutral-500" />
+                          )}
+                          {m}
+                        </div>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100 bg-white">
-                  {tasks.map((task, i) => (
-                    <tr key={i} className="hover:bg-neutral-50/50 transition-colors">
-                      <td className="px-8 py-4 font-medium text-neutral-900 flex items-center gap-3">
-                        <div className="h-8 w-8 rounded bg-neutral-100 border border-neutral-200 flex items-center justify-center text-neutral-500">
-                          {i + 1}
-                        </div>
-                        {task.name}
+                  {filteredRows.length > 0 ? filteredRows.map((row, i) => (
+                    <tr key={i} className="hover:bg-indigo-50/30 transition-colors group">
+                      <td className="px-8 py-4 font-medium text-neutral-900 border-r border-neutral-50 max-w-[300px] truncate group-hover:text-indigo-900">
+                        {row['Project Name'] || 'N/A'}
                       </td>
-                      <td className="px-8 py-4">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold
-                          ${task.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' : 
-                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' : 
-                            'bg-amber-100 text-amber-700'}`}>
-                          {task.status === 'Completed' ? <CheckCircle2 className="h-3.5 w-3.5" /> : 
-                           task.status === 'In Progress' ? <TrendingUp className="h-3.5 w-3.5" /> : 
-                           <AlertCircle className="h-3.5 w-3.5" />}
-                          {task.status}
-                        </span>
-                      </td>
-                      <td className="px-8 py-4 whitespace-nowrap text-neutral-600 font-mono text-xs">{task.due}</td>
-                      <td className="px-8 py-4 text-neutral-600 italic">"{task.feedback}"</td>
+                      {metrics.map((m, idx) => (
+                        <td key={m} className={`px-8 py-4 text-right font-mono ${idx === 0 ? 'text-indigo-600 font-semibold' : 'text-neutral-600'}`}>
+                          {row[m] != null ? row[m].toLocaleString() : '-'}
+                        </td>
+                      ))}
                     </tr>
-                  ))}
-                  {/* Extracted direct action items if they exist on the record */}
-                  {employee.Action_Items && (
-                    <tr className="bg-indigo-50/30">
-                       <td className="px-8 py-4 font-medium text-indigo-900 flex items-center gap-3">
-                        <div className="h-2 w-2 rounded-full bg-indigo-500 ml-3"></div>
-                        Direct Action Item
-                      </td>
-                      <td className="px-8 py-4" colSpan={3}>
-                        <span className="text-neutral-700">{employee.Action_Items}</span>
+                  )) : (
+                    <tr>
+                      <td className="px-8 py-8 text-center text-neutral-500" colSpan={metrics.length + 1}>
+                        <FolderKanban className="h-8 w-8 mx-auto text-neutral-300 mb-2" />
+                        No records match your filters.
                       </td>
                     </tr>
                   )}
@@ -303,3 +479,5 @@ export function EmployeeDashboard({ employee, onBack, lastUpdated }: EmployeeDas
     </div>
   );
 }
+
+

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { EmployeeData } from '../types';
+import { OwnerData } from '../types';
 import { Search, ShieldCheck, User, Building2, TrendingUp, Users } from 'lucide-react';
 
 interface PublicDirectoryProps {
-  employees: EmployeeData[];
-  onSelectEmployee: (emp: EmployeeData) => void;
+  employees: OwnerData[];
+  onSelectEmployee: (emp: OwnerData) => void;
   onAdminLogin: () => void;
 }
 
@@ -13,10 +13,8 @@ export function PublicDirectory({ employees, onSelectEmployee, onAdminLogin }: P
 
   const filtered = employees.filter(emp => {
     const term = search.toLowerCase();
-    const name = `${emp.Name || ''}`.toLowerCase();
-    return name.includes(term) || 
-           (emp.Department || '').toLowerCase().includes(term) ||
-           (emp.Email || '').toLowerCase().includes(term);
+    const name = `${emp.Owner || ''}`.toLowerCase();
+    return name.includes(term);
   });
 
   return (
@@ -43,16 +41,16 @@ export function PublicDirectory({ employees, onSelectEmployee, onAdminLogin }: P
           <div>
             <h1 className="text-3xl font-bold tracking-tight mb-2 flex items-center gap-3">
               <Users className="h-8 w-8 text-indigo-600" />
-              Employee Directory
+              Owner Directory
             </h1>
-            <p className="text-neutral-500">Public overview of all employee performance dashboards.</p>
+            <p className="text-neutral-500">Public overview of project dashboards organized by Owner.</p>
           </div>
           
           <div className="w-full md:w-96 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-neutral-400" />
             <input 
               type="text"
-              placeholder="Search by name, email, or department..."
+              placeholder="Search by owner name..."
               className="w-full pl-10 pr-4 py-3 rounded-xl border border-neutral-300 focus:ring-2 focus:ring-indigo-600 focus:border-transparent outline-none transition-all"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -68,14 +66,11 @@ export function PublicDirectory({ employees, onSelectEmployee, onAdminLogin }: P
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-10">
-            <p className="text-neutral-500">No employees match your search.</p>
+            <p className="text-neutral-500">No owners match your search.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filtered.map((emp, idx) => {
-              const scores = [emp.Q1_Score, emp.Q2_Score, emp.Q3_Score, emp.Q4_Score].filter(n => typeof n === 'number' && !isNaN(n));
-              const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 'N/A';
-
               return (
                 <div 
                   key={idx}
@@ -85,29 +80,29 @@ export function PublicDirectory({ employees, onSelectEmployee, onAdminLogin }: P
                   <div className="flex items-start justify-between mb-4">
                     <div className="h-12 w-12 rounded-full bg-indigo-50 flex items-center justify-center border border-indigo-100 group-hover:bg-indigo-600 transition-colors">
                       <span className="text-indigo-600 font-bold group-hover:text-white transition-colors">
-                        {(emp.Name?.[0] || '')}
+                        {(emp.Owner?.[0] || 'O')}
                       </span>
                     </div>
                     <span className="text-xs font-medium text-neutral-500 bg-neutral-100 px-2.5 py-1 rounded-full truncate max-w-[120px]">
-                      {emp.Email}
+                      Records: {emp.Rows.length}
                     </span>
                   </div>
                   
-                  <h3 className="text-lg font-bold text-neutral-900 line-clamp-1 mb-1" title={emp.Name}>
-                    {emp.Name}
+                  <h3 className="text-lg font-bold text-neutral-900 line-clamp-1 mb-1" title={emp.Owner}>
+                    {emp.Owner}
                   </h3>
                   
                   <div className="flex items-center gap-2 text-sm text-neutral-500 mb-6">
                     <Building2 className="h-4 w-4 shrink-0" />
-                    <span className="line-clamp-1">{emp.Department || 'Unassigned'}</span>
+                    <span className="line-clamp-1">Projects</span>
                   </div>
 
                   <div className="mt-auto pt-4 border-t border-neutral-100 flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-neutral-500 mb-0.5">Avg Score</p>
+                      <p className="text-xs text-neutral-500 mb-0.5">Summary</p>
                       <p className="font-bold text-neutral-900 flex items-center gap-1.5">
-                        {avgScore !== 'N/A' && <TrendingUp className="h-4 w-4 text-emerald-500" />}
-                        {avgScore}
+                        <TrendingUp className="h-4 w-4 text-emerald-500" />
+                        View Performance
                       </p>
                     </div>
                     <div className="text-indigo-600 text-sm font-semibold opacity-0 group-hover:opacity-100 transition-opacity">
@@ -123,3 +118,4 @@ export function PublicDirectory({ employees, onSelectEmployee, onAdminLogin }: P
     </div>
   );
 }
+
